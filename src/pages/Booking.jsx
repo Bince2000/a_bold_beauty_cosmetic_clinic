@@ -1,11 +1,4 @@
 import { useState } from 'react'
-import emailjs from '@emailjs/browser'
-
-// ─── EmailJS config (set these in your .env file) ──────────────────────────
-const EMAILJS_PUBLIC_KEY      = import.meta.env.VITE_EMAILJS_PUBLIC_KEY
-const EMAILJS_SERVICE_ID      = import.meta.env.VITE_EMAILJS_SERVICE_ID
-const EMAILJS_OWNER_TEMPLATE  = import.meta.env.VITE_EMAILJS_OWNER_TEMPLATE_ID
-const EMAILJS_CUSTOMER_TEMPLATE = import.meta.env.VITE_EMAILJS_CUSTOMER_TEMPLATE_ID
 
 const serviceOptions = [
   { group: 'Permanent Makeup', items: [
@@ -49,8 +42,6 @@ const initialForm = {
 export default function Booking() {
   const [form, setForm]           = useState(initialForm)
   const [submitted, setSubmitted] = useState(false)
-  const [loading, setLoading]     = useState(false)
-  const [sendError, setSendError] = useState('')
   const [errors, setErrors]       = useState({})
 
   const today = new Date().toISOString().split('T')[0]
@@ -60,8 +51,6 @@ export default function Booking() {
     if (!form.name.trim())  e.name    = 'Name is required'
     if (!form.phone.trim()) e.phone   = 'Phone number is required'
     else if (!/^\d{10}$/.test(form.phone.replace(/\s/g, ''))) e.phone = 'Enter a valid 10-digit number'
-    if (!form.email.trim()) e.email   = 'Email is required to send confirmation'
-    else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) e.email = 'Enter a valid email address'
     if (!form.service)      e.service = 'Please select a service'
     if (!form.date)         e.date    = 'Please choose a date'
     if (!form.time)         e.time    = 'Please choose a time slot'
@@ -72,56 +61,13 @@ export default function Booking() {
     const { name, value } = e.target
     setForm(prev => ({ ...prev, [name]: value }))
     if (errors[name]) setErrors(prev => ({ ...prev, [name]: '' }))
-    if (sendError)    setSendError('')
   }
 
-  async function handleSubmit(e) {
+  function handleSubmit(e) {
     e.preventDefault()
     const e2 = validate()
     if (Object.keys(e2).length) { setErrors(e2); return }
-
-    setLoading(true)
-    setSendError('')
-
-    // Shared template variables
-    const templateParams = {
-      customer_name:    form.name,
-      customer_phone:   form.phone,
-      customer_email:   form.email,
-      service:          form.service,
-      date:             form.date,
-      time:             form.time,
-      notes:            form.notes || 'None',
-      clinic_name:      'A Bold Beauty Cosmetic Clinic',
-      clinic_phone:     '04XX XXX XXX',
-      clinic_email:     'hello@aboldbeauty.com.au',
-      clinic_location:  'Melbourne, VIC',
-    }
-
-    try {
-      // 1. Notify the owner
-      await emailjs.send(
-        EMAILJS_SERVICE_ID,
-        EMAILJS_OWNER_TEMPLATE,
-        templateParams,
-        EMAILJS_PUBLIC_KEY
-      )
-
-      // 2. Send confirmation to the customer
-      await emailjs.send(
-        EMAILJS_SERVICE_ID,
-        EMAILJS_CUSTOMER_TEMPLATE,
-        templateParams,
-        EMAILJS_PUBLIC_KEY
-      )
-
-      setSubmitted(true)
-    } catch (err) {
-      console.error('EmailJS error:', err)
-      setSendError('Could not send the confirmation email. Please try again or call us directly.')
-    } finally {
-      setLoading(false)
-    }
+    setSubmitted(true)
   }
 
   // ─── Success screen ────────────────────────────────────────────────────────
@@ -136,7 +82,6 @@ export default function Booking() {
           <p className="text-base-content/70 mb-2 text-base sm:text-lg">
             Hi <strong>{form.name}</strong>, we can't wait to see you!
           </p>
-
           <div className="card bg-base-200 border border-secondary/20 my-5 text-left">
             <div className="card-body gap-3 p-4 sm:p-6">
               {[
@@ -144,23 +89,18 @@ export default function Booking() {
                 ['Date',    form.date],
                 ['Time',    form.time],
                 ['Phone',   form.phone],
-                ['Email',   form.email],
               ].map(([label, val]) => (
                 <div key={label} className="flex justify-between gap-4 text-sm">
                   <span className="text-base-content/50 font-medium shrink-0">{label}</span>
-                  <span className="font-semibold text-base-content text-right break-all">{val}</span>
+                  <span className="font-semibold text-base-content text-right">{val}</span>
                 </div>
               ))}
             </div>
           </div>
-
-          <div className="alert bg-accent border-secondary/30 text-sm mb-5 text-left">
-            <span>📧</span>
-            <span>A confirmation email has been sent to <strong>{form.email}</strong>.</span>
-          </div>
-
-          <div className="badge badge-primary badge-lg mb-5 py-3 px-5">🎁 10% OFF — First Visit Applied!</div>
-
+          <div className="badge badge-primary badge-lg mb-4 py-3 px-5">🎁 10% OFF — First Visit Applied!</div>
+          <p className="text-sm text-base-content/50 mb-6">
+            We'll confirm via SMS to <strong>{form.phone}</strong>. See you soon! 💕
+          </p>
           <button
             className="btn btn-primary btn-lg rounded-full px-10 w-full sm:w-auto"
             onClick={() => { setForm(initialForm); setSubmitted(false) }}
@@ -190,14 +130,6 @@ export default function Booking() {
       >
         <div className="card bg-base-100 border border-secondary/20 shadow-md">
           <div className="card-body gap-5 p-5 sm:p-8">
-
-            {/* Email send error alert */}
-            {sendError && (
-              <div className="alert alert-error text-sm">
-                <span>⚠️ {sendError}</span>
-              </div>
-            )}
-
             <form onSubmit={handleSubmit} className="flex flex-col gap-4 sm:gap-5" noValidate>
 
               {/* Name */}
@@ -227,20 +159,18 @@ export default function Booking() {
                 {errors.phone && <span className="text-error text-xs">{errors.phone}</span>}
               </div>
 
-              {/* Email — required now */}
+              {/* Email — optional */}
               <div className="form-control gap-1">
                 <label className="label py-1">
                   <span className="label-text font-medium">
-                    Email <span className="text-error">*</span>
-                    <span className="text-base-content/40 text-xs font-normal ml-1">(confirmation sent here)</span>
+                    Email <span className="text-base-content/40 text-xs font-normal">(optional)</span>
                   </span>
                 </label>
                 <input
                   type="email" name="email" placeholder="your@email.com"
                   value={form.email} onChange={handleChange}
-                  className={`input input-bordered w-full rounded-xl ${errors.email ? 'input-error' : ''}`}
+                  className="input input-bordered w-full rounded-xl"
                 />
-                {errors.email && <span className="text-error text-xs">{errors.email}</span>}
               </div>
 
               {/* Service */}
@@ -305,19 +235,8 @@ export default function Booking() {
                 />
               </div>
 
-              <button
-                type="submit"
-                disabled={loading}
-                className="btn btn-primary btn-lg rounded-full w-full mt-1 disabled:opacity-70"
-              >
-                {loading ? (
-                  <>
-                    <span className="loading loading-spinner loading-sm" />
-                    Sending...
-                  </>
-                ) : (
-                  'Confirm Appointment ✨'
-                )}
+              <button type="submit" className="btn btn-primary btn-lg rounded-full w-full mt-1">
+                Confirm Appointment ✨
               </button>
             </form>
           </div>
